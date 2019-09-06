@@ -1,0 +1,161 @@
+# Python
+# some scripts using python
+# compute atoms distance, angle and dihedral angle
+
+import time
+import math
+from matplotlib.pylab import *
+
+def BondDistance(atom1,atom2,box):           # The most difficult part for me.
+    dx = abs(atom1[0] - atom2[0])
+    dy = abs(atom1[1] - atom2[1])             # } Get the dx, dy, dz for two atom coordinate.
+    dz = abs(atom1[2] - atom2[2])
+    dx = dx-box[0]*int(dx/box[0]+0.5)
+    dy = dy-box[1]*int(dy/box[1]+0.5) # https://en.wikipedia.org/wiki/Periodic_boundary_conditions
+    dz = dz-box[2]*int(dz/box[2]+0.5)
+    return math.sqrt(dx**2 + dy**2 + dz**2)
+
+def AngleDegree(a,b,c):           # The most difficult part for me.
+    costheta=(a*a+b*b-c*c)/2/a/b
+    theta=math.acos(costheta)/math.pi*180
+    return theta
+
+def NormalVector(a,b,c,d,e,f):
+    vector = (a-b)*(c-d)-(e-d)*(f-b)
+    return vector
+
+def DihedralDegree(a,b,c,d,e,f):
+    value1 = a*d+b*e+c*f
+    value2 = math.sqrt(a**2 + b**2 + c**2)
+    value3 = math.sqrt(d**2 + e**2 + f**2)
+    costheta=value1/value2/value3
+    theta=math.acos(costheta)/math.pi*180
+    return theta
+
+def output_pic(px,py,picname,docname):
+    fig, ax = plt.subplots()   # !!!
+    plt.xlabel('Time (ps)')
+    plt.ylabel(picname)
+    ax.plot(px,py,'Blue',linewidth=1,label=picname)  
+    leg=legend(loc='upper right',fontsize=14)
+    leg.get_frame().set_linewidth(0.)
+    fig.savefig(docname+picname+'.png')   
+
+def output_data(px,py,dataname,docname):
+    file = open(dataname,'w')
+    for i in range(len(px)):
+        x = str(px[i])
+        y = str(py[i])
+        s = str(px[i])+' '+str(py[i])+'\n'
+        file.write(s)
+    file.close()
+    print("saving data successful")
+    
+def main():
+    StartFrame=0
+    EndFrame=220
+    IDList=[[476,475,477,478]]
+    filename='test.lammpstrj'
+    #                       o ID[3]
+    #                      /
+    # Worning:  ID[1] o —— o ID[2]
+    #                /  
+    #         ID[0] o   
+    for ID in IDList:
+        docname='./Atom-'+str(ID[0])+'-'+str(ID[1])+'-'+str(ID[2])+'-'+str(ID[3])+'-'
+
+        BondSelect=[1,1,1]    # 1:plot, 0:Nplot. BondSelect[0]: ID[0]-[1], [1]: 1-2, [2]: 2-0.
+        xyzdir=[{'frame':0,'ID0':[0,0,0],'ID1':[0,0,0],'ID2':[0,0,0],'ID3':[0,0,0],'Box':[0,0,0]} for i in range(EndFrame-StartFrame)]
+        with open(filename,'r') as fr:
+            fline=fr.readlines()
+            nline=len(fline)
+            natom=int(fline[3].split()[0])
+            lnumb=natom+9
+
+        # get data from lammpstrj.
+        with open(filename,'r') as f1:
+            lines=f1.readlines()
+            nfram=int(nline/lnumb)
+            if ID==IDList[0]:
+                print('# line of file:',nline,'number of atoms:',natom,'number of frame:',nfram)
+            num=-1
+            for i,line in enumerate(lines):
+                if i<StartFrame*lnumb or i>EndFrame*lnumb-1:
+                    continue
+                if i%lnumb==1:
+                    num += 1
+                    xyzdir[num]['frame']=int(line.split()[0])
+                if i%lnumb in [5,6,7]:
+                    xyzdir[num]['Box'][i%lnumb-5]=float(line.split()[1])-float(line.split()[0])
+                if i%lnumb<9:
+                    continue
+                AtomID=int(line.split()[0])
+                if AtomID in ID:
+                    name='ID'+str(ID.index(AtomID))
+                    x=float(line.split()[2])
+                    y=float(line.split()[3])
+                    z=float(line.split()[4])
+                    xyzdir[num][name]=[x,y,z]    
+
+        # plot data.
+        Time=[]
+        BondDis0=[]
+        BondDis1=[]
+        BondDis2=[]
+        Degree=[]
+        Dihedral=[]
+        for i,atom in enumerate(xyzdir):
+            nframe=atom['frame'] * 1e-3  # units to ps
+            Time.append(nframe)
+            xyz0=atom['ID0']
+            xyz1=atom['ID1']
+            xyz2=atom['ID2']
+            xyz3=atom['ID3']
+            box=atom['Box']
+            ax=atom['ID0'][0]
+            ay=atom['ID0'][1]
+            az=atom['ID0'][2]
+            bx=atom['ID1'][0]
+            by=atom['ID1'][1]
+            bz=atom['ID1'][2]
+            cx=atom['ID2'][0]
+            cy=atom['ID2'][1]
+            cz=atom['ID2'][2]
+            dx=atom['ID3'][0]
+            dy=atom['ID3'][1]
+            dz=atom['ID3'][2]
+            m0=NormalVector(ay,by,cz,bz,az,cy)
+            m1=NormalVector(az,bz,cx,bx,ax,cz)
+            m2=NormalVector(ax,bx,cy,by,ay,cx)
+            n0=NormalVector(by,cy,dz,cz,bz,dy)
+            n1=NormalVector(bz,cz,dx,cx,bx,dz)
+            n2=NormalVector(bx,cx,dy,cy,by,dx)
+            Dihedral.append(DihedralDegree(m0,m1,m2,n0,n1,n2))
+            Dis0=BondDistance(xyz0,xyz1,box)
+            Dis1=BondDistance(xyz1,xyz2,box)
+            Dis2=BondDistance(xyz2,xyz0,box)
+            BondDis0.append(Dis0)
+            BondDis1.append(Dis1)
+            BondDis2.append(Dis2)
+            Degree.append(AngleDegree(Dis0,Dis1,Dis2))
+        if BondSelect[0]:
+            output_pic(Time,BondDis0,'Bond_0-1_Distance',docname)
+            output_data(Time,BondDis0,'Bond_0-1_Distance',docname)   
+        if BondSelect[1]:
+            output_pic(Time,BondDis1,'Bond_1-2_Distance',docname)
+            output_data(Time,BondDis1,'Bond_1-2_Distance',docname)
+        if BondSelect[2]:
+            output_pic(Time,BondDis2,'Bond_2-0_Distance',docname)
+            output_data(Time,BondDis2,'Bond_2-0_Distance',docname)
+        output_pic(Time,Degree,'Angle_Degree',docname)
+        output_data(Time,Degree,'Angle_Degree',docname)
+        output_pic(Time,Dihedral,'Angle_Diheral',docname)
+        output_data(Time,Dihedral,'Angle_Diheral',docname)
+
+# start
+if __name__ == '__main__':
+    clock_start = time.process_time()
+    main()
+    clock_end = time.process_time()
+    print ('Run time of program',clock_end-clock_start)
+
