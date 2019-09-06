@@ -6,16 +6,16 @@ import time
 import math
 from matplotlib.pylab import *
 
-def BondDistance(atom1,atom2,box):           # The most difficult part for me.
+def BondDistance(atom1,atom2,box):          
     dx = abs(atom1[0] - atom2[0])
-    dy = abs(atom1[1] - atom2[1])             # } Get the dx, dy, dz for two atom coordinate.
+    dy = abs(atom1[1] - atom2[1])             
     dz = abs(atom1[2] - atom2[2])
     dx = dx-box[0]*int(dx/box[0]+0.5)
-    dy = dy-box[1]*int(dy/box[1]+0.5) # https://en.wikipedia.org/wiki/Periodic_boundary_conditions
+    dy = dy-box[1]*int(dy/box[1]+0.5) 
     dz = dz-box[2]*int(dz/box[2]+0.5)
     return math.sqrt(dx**2 + dy**2 + dz**2)
 
-def AngleDegree(a,b,c):           # The most difficult part for me.
+def AngleDegree(a,b,c):          
     costheta=(a*a+b*b-c*c)/2/a/b
     theta=math.acos(costheta)/math.pi*180
     return theta
